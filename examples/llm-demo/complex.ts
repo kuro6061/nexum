@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Nexum Complex Workflow Demo
  *
  * 6-step deep research pipeline with 3 Gemini API calls.
@@ -10,7 +10,7 @@
 import { nexum, Worker, NexumClient } from '@nexum/sdk';
 import { z } from 'zod';
 
-const GEMINI_API_KEY = 'AIzaSyDRPEm_g_vcdyEWX7IUdNgDSeAX-a1vQQw';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? '';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 let geminiCallCount = 0;
@@ -18,7 +18,7 @@ let geminiCallCount = 0;
 async function callGemini(prompt: string): Promise<string> {
   geminiCallCount++;
   const callNum = geminiCallCount;
-  console.log(`  [Gemini API call #${callNum}] ← ${prompt.slice(0, 60).replace(/\n/g, ' ')}...`);
+  console.log(`  [Gemini API call #${callNum}] 竊・${prompt.slice(0, 60).replace(/\n/g, ' ')}...`);
   const res = await fetch(GEMINI_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -30,7 +30,7 @@ async function callGemini(prompt: string): Promise<string> {
   if (!res.ok) throw new Error(`Gemini error: ${res.status}`);
   const data = await res.json() as any;
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
-  console.log(`  [Gemini #${callNum}] ✓ ${text.length} chars`);
+  console.log(`  [Gemini #${callNum}] 笨・${text.length} chars`);
   return text;
 }
 
@@ -41,7 +41,7 @@ function safeJson(raw: string, fallback: any): any {
   return fallback;
 }
 
-// ─── スキーマ ────────────────────────────────────────────────
+// 笏笏笏 繧ｹ繧ｭ繝ｼ繝・笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
 const ParsedQuery   = z.object({ topic: z.string(), angle: z.string() });
 const SearchData    = z.object({ snippets: z.array(z.string()) });
 const ExtractedFacts = z.object({ facts: z.array(z.string()), source_count: z.number() });
@@ -49,18 +49,16 @@ const KnowledgeGaps = z.object({ gaps: z.array(z.string()), priority: z.string()
 const Synthesis     = z.object({ thesis: z.string(), evidence: z.array(z.string()), confidence: z.number() });
 const FinalReport   = z.object({ title: z.string(), executive_summary: z.string(), score: z.number() });
 
-// ─── 6ステップ ワークフロー ──────────────────────────────────
+// 笏笏笏 6繧ｹ繝・ャ繝・繝ｯ繝ｼ繧ｯ繝輔Ο繝ｼ 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
 const deepResearch = nexum.workflow('DeepResearchPipeline')
 
-  // STEP 1: COMPUTE — クエリ解析（Gemini不使用、無料）
-  .compute('parse_query', ParsedQuery, (ctx) => {
+  // STEP 1: COMPUTE 窶・繧ｯ繧ｨ繝ｪ隗｣譫撰ｼ・emini荳堺ｽｿ逕ｨ縲∫┌譁呻ｼ・  .compute('parse_query', ParsedQuery, (ctx) => {
     const query: string = ctx.input.query;
     console.log(`  [STEP 1] parse_query: "${query}"`);
     return { topic: query, angle: 'technical comparison and practical applications' };
   })
 
-  // STEP 2: EFFECT — 検索（モック、無料）
-  .effect('web_search', SearchData, async (ctx) => {
+  // STEP 2: EFFECT 窶・讀懃ｴ｢・医Δ繝・け縲∫┌譁呻ｼ・  .effect('web_search', SearchData, async (ctx) => {
     const { topic } = ctx.get('parse_query');
     console.log(`  [STEP 2] web_search: "${topic}"`);
     await sleep(200);
@@ -75,7 +73,7 @@ const deepResearch = nexum.workflow('DeepResearchPipeline')
     };
   })
 
-  // STEP 3: EFFECT — Gemini① 事実抽出
+  // STEP 3: EFFECT 窶・Gemini竭 莠句ｮ滓歓蜃ｺ
   .effect('llm_extract_facts', ExtractedFacts, async (ctx) => {
     const search = ctx.get('web_search');
     const { topic } = ctx.get('parse_query');
@@ -87,7 +85,7 @@ const deepResearch = nexum.workflow('DeepResearchPipeline')
     return { facts: p.facts ?? [], source_count: typeof p.source_count === 'number' ? p.source_count : 5 };
   })
 
-  // STEP 4: EFFECT — Gemini② ギャップ分析 ← ここでクラッシュ
+  // STEP 4: EFFECT 窶・Gemini竭｡ 繧ｮ繝｣繝・・蛻・梵 竊・縺薙％縺ｧ繧ｯ繝ｩ繝・す繝･
   .effect('llm_find_gaps', KnowledgeGaps, async (ctx) => {
     const extracted = ctx.get('llm_extract_facts');
     const { topic } = ctx.get('parse_query');
@@ -99,8 +97,7 @@ const deepResearch = nexum.workflow('DeepResearchPipeline')
     return { gaps: p.gaps ?? [], priority: p.priority ?? 'medium' };
   })
 
-  // STEP 5: EFFECT — Gemini③ 総合分析（Worker 2が担当）
-  .effect('llm_synthesize', Synthesis, async (ctx) => {
+  // STEP 5: EFFECT 窶・Gemini竭｢ 邱丞粋蛻・梵・・orker 2縺梧球蠖難ｼ・  .effect('llm_synthesize', Synthesis, async (ctx) => {
     const facts = ctx.get('llm_extract_facts');
     const gaps  = ctx.get('llm_find_gaps');
     const { topic } = ctx.get('parse_query');
@@ -112,8 +109,7 @@ const deepResearch = nexum.workflow('DeepResearchPipeline')
     return { thesis: p.thesis ?? '', evidence: p.evidence ?? [], confidence: typeof p.confidence === 'number' ? p.confidence : 0.88 };
   })
 
-  // STEP 6: COMPUTE — 最終レポート生成（データ整形のみ、Gemini不使用）
-  .compute('final_report', FinalReport, (ctx) => {
+  // STEP 6: COMPUTE 窶・譛邨ゅΞ繝昴・繝育函謌撰ｼ医ョ繝ｼ繧ｿ謨ｴ蠖｢縺ｮ縺ｿ縲；emini荳堺ｽｿ逕ｨ・・  .compute('final_report', FinalReport, (ctx) => {
     const synthesis = ctx.get('llm_synthesize');
     const { topic }  = ctx.get('parse_query');
     console.log(`  [STEP 6] final_report: assembling...`);
@@ -126,16 +122,16 @@ const deepResearch = nexum.workflow('DeepResearchPipeline')
 
   .build();
 
-// ─── デモ実行 ───────────────────────────────────────────────
+// 笏笏笏 繝・Δ螳溯｡・笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
 async function runDemo() {
   const client = new NexumClient();
 
-  console.log('\n╔══════════════════════════════════════════════════╗');
-  console.log('║   NEXUM COMPLEX WORKFLOW DEMO  (6 steps)         ║');
-  console.log('╚══════════════════════════════════════════════════╝\n');
-  console.log('Steps: parse → search → extract_facts → find_gaps → synthesize → report');
-  console.log('       (free)  (free)   [Gemini①]      [Gemini②]   [Gemini③]   (free)');
-  console.log('                                              ↑');
+  console.log('\n笊披武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶風');
+  console.log('笊・  NEXUM COMPLEX WORKFLOW DEMO  (6 steps)         笊・);
+  console.log('笊壺武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶幅\n');
+  console.log('Steps: parse 竊・search 竊・extract_facts 竊・find_gaps 竊・synthesize 竊・report');
+  console.log('       (free)  (free)   [Gemini竭]      [Gemini竭｡]   [Gemini竭｢]   (free)');
+  console.log('                                              竊・);
   console.log('                                        CRASH HERE\n');
 
   const worker1 = new Worker('localhost:50051', 'worker-1');
@@ -148,9 +144,9 @@ async function runDemo() {
     { query: 'Durable execution for LLM agents' }
   );
   console.log(`[NEXUM] Execution started: ${executionId}\n`);
-  console.log('━━━ Worker 1 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('笏≫煤笏・Worker 1 笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏・);
 
-  // llm_find_gaps (STEP 4) 完了を検知 → クラッシュ
+  // llm_find_gaps (STEP 4) 螳御ｺ・ｒ讀懃衍 竊・繧ｯ繝ｩ繝・す繝･
   const callsBefore = { count: 0 };
   await waitFor(async () => {
     const s = await client.getStatus(executionId);
@@ -159,13 +155,12 @@ async function runDemo() {
   }, 120000);
 
   callsBefore.count = geminiCallCount;
-  console.log(`\n💥 CRASH! (after STEP 4 / Gemini call #${callsBefore.count})\n`);
+  console.log(`\n徴 CRASH! (after STEP 4 / Gemini call #${callsBefore.count})\n`);
   worker1.stop();
   await sleep(500);
 
-  // Worker 2 スタート
-  geminiCallCount = 0; // Worker 2のカウントをリセット
-  console.log('━━━ Worker 2 (recovery) ━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  // Worker 2 繧ｹ繧ｿ繝ｼ繝・  geminiCallCount = 0; // Worker 2縺ｮ繧ｫ繧ｦ繝ｳ繝医ｒ繝ｪ繧ｻ繝・ヨ
+  console.log('笏≫煤笏・Worker 2 (recovery) 笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤');
   const worker2 = new Worker('localhost:50051', 'worker-2');
   worker2.register(deepResearch);
   worker2.start();
@@ -180,33 +175,33 @@ async function runDemo() {
 
   const nodes = finalStatus?.completedNodes ?? {};
 
-  console.log('\n╔══════════════════════════════════════════════════╗');
-  console.log('║                  FINAL RESULT                   ║');
-  console.log('╚══════════════════════════════════════════════════╝\n');
+  console.log('\n笊披武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶風');
+  console.log('笊・                 FINAL RESULT                   笊・);
+  console.log('笊壺武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶幅\n');
   console.log(`Status: ${finalStatus?.status}`);
-  console.log(`Steps:  ${Object.keys(nodes).join(' → ')}\n`);
+  console.log(`Steps:  ${Object.keys(nodes).join(' 竊・')}\n`);
 
   if (nodes['final_report']) {
     const r = nodes['final_report'] as any;
     const report = typeof r === 'string' ? JSON.parse(r) : r;
-    console.log(`📋 ${report.title}`);
-    console.log(`📊 Score: ${report.score}/100`);
-    console.log(`📝 ${report.executive_summary}\n`);
+    console.log(`搭 ${report.title}`);
+    console.log(`投 Score: ${report.score}/100`);
+    console.log(`統 ${report.executive_summary}\n`);
   }
 
   if (nodes['llm_extract_facts']) {
     const r = nodes['llm_extract_facts'] as any;
     const facts = typeof r === 'string' ? JSON.parse(r) : r;
-    console.log(`🔍 Extracted facts (${facts.source_count} sources):`);
-    (facts.facts ?? []).slice(0, 3).forEach((f: string) => console.log(`   • ${f}`));
+    console.log(`剥 Extracted facts (${facts.source_count} sources):`);
+    (facts.facts ?? []).slice(0, 3).forEach((f: string) => console.log(`   窶｢ ${f}`));
     console.log();
   }
 
-  console.log('━━━ Cost Analysis ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('笏≫煤笏・Cost Analysis 笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤笏≫煤');
   console.log(`Gemini calls by Worker 1: ${callsBefore.count} (steps 3-4)`);
   console.log(`Gemini calls by Worker 2: ${geminiCallCount} (step 5 only)`);
   console.log(`Gemini calls SAVED by Nexum: ${callsBefore.count} (NOT re-executed!)`);
-  console.log(`\n✅ [SUCCESS] Worker 2 ran only STEP 5 — steps 1-4 were NOT repeated.`);
+  console.log(`\n笨・[SUCCESS] Worker 2 ran only STEP 5 窶・steps 1-4 were NOT repeated.`);
   console.log(`   In production: saves API cost + time for every crash/redeploy.\n`);
 }
 
@@ -226,3 +221,4 @@ function waitFor(pred: () => boolean | Promise<boolean>, timeout: number) {
 }
 
 runDemo().catch(console.error);
+

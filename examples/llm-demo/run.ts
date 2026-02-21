@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Nexum LLM Demo
  * 4-step workflow with real Gemini API calls + durability test
  *
- * Workflow: parse_query → web_research → llm_analyze (Gemini) → llm_report (Gemini)
+ * Workflow: parse_query 竊・web_research 竊・llm_analyze (Gemini) 竊・llm_report (Gemini)
  *
  * Durability test: crash after llm_analyze, Worker 2 resumes from llm_report only
  */
@@ -10,7 +10,7 @@
 import { nexum, Worker, NexumClient } from '@nexum/sdk';
 import { z } from 'zod';
 
-const GEMINI_API_KEY = 'AIzaSyDRPEm_g_vcdyEWX7IUdNgDSeAX-a1vQQw';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? '';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 async function callGemini(prompt: string, json = false): Promise<string> {
@@ -29,7 +29,7 @@ async function callGemini(prompt: string, json = false): Promise<string> {
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '(no response)';
 }
 
-// ─── スキーマ定義 ──────────────────────────────────────────
+// 笏笏笏 繧ｹ繧ｭ繝ｼ繝槫ｮ夂ｾｩ 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
 const ParsedQuery = z.object({
   topic: z.string(),
   keywords: z.array(z.string()),
@@ -52,11 +52,10 @@ const FinalReport = z.object({
   score: z.number(),
 });
 
-// ─── ワークフロー定義 ────────────────────────────────────────
+// 笏笏笏 繝ｯ繝ｼ繧ｯ繝輔Ο繝ｼ螳夂ｾｩ 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
 const researchAgent = nexum.workflow('DeepResearchAgent')
 
-  // Step 1: COMPUTE — 入力を解析（ローカル処理、副作用なし）
-  .compute('parse_query', ParsedQuery, (ctx) => {
+  // Step 1: COMPUTE 窶・蜈･蜉帙ｒ隗｣譫撰ｼ医Ο繝ｼ繧ｫ繝ｫ蜃ｦ逅・∝憶菴懃畑縺ｪ縺暦ｼ・  .compute('parse_query', ParsedQuery, (ctx) => {
     const query: string = ctx.input.query;
     const words = query.toLowerCase().split(' ').filter(w => w.length > 3);
     return {
@@ -65,12 +64,11 @@ const researchAgent = nexum.workflow('DeepResearchAgent')
     };
   })
 
-  // Step 2: EFFECT — Web検索（外部呼び出し、冪等性キー自動付与）
-  .effect('web_research', ResearchData, async (ctx) => {
+  // Step 2: EFFECT 窶・Web讀懃ｴ｢・亥､夜Κ蜻ｼ縺ｳ蜃ｺ縺励∝・遲画ｧ繧ｭ繝ｼ閾ｪ蜍穂ｻ倅ｸ趣ｼ・  .effect('web_research', ResearchData, async (ctx) => {
     const { topic, keywords } = ctx.get('parse_query');
     console.log(`  [search] topic="${topic}" keywords=[${keywords.join(', ')}]`);
     await sleep(300);
-    // 実際のプロダクトでは検索APIを呼ぶ
+    // 螳滄圀縺ｮ繝励Ο繝繧ｯ繝医〒縺ｯ讀懃ｴ｢API繧貞他縺ｶ
     return {
       sources: [
         `https://arxiv.org/search/${encodeURIComponent(topic)}`,
@@ -87,14 +85,12 @@ const researchAgent = nexum.workflow('DeepResearchAgent')
     };
   })
 
-  // Step 3: EFFECT — Gemini で分析（本物のLLM呼び出し）
-  .effect('llm_analyze', Analysis, async (ctx) => {
+  // Step 3: EFFECT 窶・Gemini 縺ｧ蛻・梵・域悽迚ｩ縺ｮLLM蜻ｼ縺ｳ蜃ｺ縺暦ｼ・  .effect('llm_analyze', Analysis, async (ctx) => {
     const research = ctx.get('web_research');
     const query = ctx.get('parse_query');
 
     console.log(`  [Gemini] Analyzing research on "${query.topic}"...`);
-    // JSON強制ではなくプレーンテキストで取得してパース（2.5-flashの思考ログ対策）
-    const prompt = `Analyze this research content about "${query.topic}" and respond with ONLY a JSON object (no markdown, no explanation):
+    // JSON蠑ｷ蛻ｶ縺ｧ縺ｯ縺ｪ縺上・繝ｬ繝ｼ繝ｳ繝・く繧ｹ繝医〒蜿門ｾ励＠縺ｦ繝代・繧ｹ・・.5-flash縺ｮ諤晁・Ο繧ｰ蟇ｾ遲厄ｼ・    const prompt = `Analyze this research content about "${query.topic}" and respond with ONLY a JSON object (no markdown, no explanation):
 {"key_points":["point1","point2","point3"],"confidence":0.85,"summary":"one sentence"}
 
 Content: ${research.raw_content.slice(0, 500)}`;
@@ -102,26 +98,26 @@ Content: ${research.raw_content.slice(0, 500)}`;
     const raw = await callGemini(prompt, true);  // JSON mode ON
     console.log(`  [Gemini] Received ${raw.length} chars`);
 
-    // 複数の戦略でJSONを抽出
+    // 隍・焚縺ｮ謌ｦ逡･縺ｧJSON繧呈歓蜃ｺ
     let parsed: any = null;
     try {
-      // 戦略1: そのままparse
+      // 謌ｦ逡･1: 縺昴・縺ｾ縺ｾparse
       parsed = JSON.parse(raw.trim());
     } catch {
       try {
-        // 戦略2: コードブロック内のJSONを抽出
+        // 謌ｦ逡･2: 繧ｳ繝ｼ繝峨ヶ繝ｭ繝・け蜀・・JSON繧呈歓蜃ｺ
         const block = raw.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
         if (block) parsed = JSON.parse(block[1]);
       } catch {}
       if (!parsed) {
-        // 戦略3: 最初の { から最後の } を抽出
+        // 謌ｦ逡･3: 譛蛻昴・ { 縺九ｉ譛蠕後・ } 繧呈歓蜃ｺ
         const match = raw.match(/\{[\s\S]*\}/);
         if (match) {
           try { parsed = JSON.parse(match[0]); } catch {}
         }
       }
     }
-    // どれも失敗したらフォールバック
+    // 縺ｩ繧後ｂ螟ｱ謨励＠縺溘ｉ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ
     if (!parsed) {
       console.log(`  [Gemini] JSON parse failed, using fallback`);
       parsed = { key_points: ['Durable execution prevents data loss', 'LLM workflows need state persistence', 'Event sourcing enables crash recovery'], confidence: 0.8, summary: 'Durable execution is critical for production LLM agents.' };
@@ -133,8 +129,7 @@ Content: ${research.raw_content.slice(0, 500)}`;
     };
   })
 
-  // Step 4: EFFECT — Gemini で最終レポート生成（本物のLLM呼び出し）
-  .effect('llm_report', FinalReport, async (ctx) => {
+  // Step 4: EFFECT 窶・Gemini 縺ｧ譛邨ゅΞ繝昴・繝育函謌撰ｼ域悽迚ｩ縺ｮLLM蜻ｼ縺ｳ蜃ｺ縺暦ｼ・  .effect('llm_report', FinalReport, async (ctx) => {
     const analysis = ctx.get('llm_analyze');
     const query = ctx.get('parse_query');
 
@@ -169,17 +164,17 @@ Respond with ONLY a JSON object (no markdown):
 
   .build();
 
-// ─── デモ実行 ───────────────────────────────────────────────
+// 笏笏笏 繝・Δ螳溯｡・笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
 async function runDemo() {
   const client = new NexumClient();
 
-  console.log('\n╔══════════════════════════════════════╗');
-  console.log('║   NEXUM × GEMINI  DURABILITY DEMO    ║');
-  console.log('╚══════════════════════════════════════╝\n');
-  console.log('Workflow: parse_query → web_research → llm_analyze → llm_report');
+  console.log('\n笊披武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶風');
+  console.log('笊・  NEXUM ﾃ・GEMINI  DURABILITY DEMO    笊・);
+  console.log('笊壺武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶幅\n');
+  console.log('Workflow: parse_query 竊・web_research 竊・llm_analyze 竊・llm_report');
   console.log('Durability test: crash after llm_analyze, resume from llm_report\n');
 
-  // Worker 1 — llm_analyze が完了したらクラッシュする
+  // Worker 1 窶・llm_analyze 縺悟ｮ御ｺ・＠縺溘ｉ繧ｯ繝ｩ繝・す繝･縺吶ｋ
   const worker1 = new Worker('localhost:50051', 'worker-1');
   worker1.register(researchAgent);
   await worker1.start();
@@ -192,17 +187,16 @@ async function runDemo() {
   console.log(`[NEXUM] Started execution: ${executionId}\n`);
   console.log('--- Worker 1 processing ---');
 
-  // status polling で llm_analyze 完了を検知（ハンドラーフックより確実）
-  await waitFor(async () => {
+  // status polling 縺ｧ llm_analyze 螳御ｺ・ｒ讀懃衍・医ワ繝ｳ繝峨Λ繝ｼ繝輔ャ繧ｯ繧医ｊ遒ｺ螳滂ｼ・  await waitFor(async () => {
     const status = await client.getStatus(executionId);
     return 'llm_analyze' in (status.completedNodes ?? {});
   }, 120000);
-  console.log('\n💥 [DEMO] Worker 1 CRASH after llm_analyze!\n');
+  console.log('\n徴 [DEMO] Worker 1 CRASH after llm_analyze!\n');
   worker1.stop();
   await sleep(600);
 
-  // Worker 2 — llm_report だけを拾って完了させる
-  console.log('🔄 [DEMO] Worker 2 starting (recovery)...');
+  // Worker 2 窶・llm_report 縺縺代ｒ諡ｾ縺｣縺ｦ螳御ｺ・＆縺帙ｋ
+  console.log('売 [DEMO] Worker 2 starting (recovery)...');
   console.log('--- Worker 2 processing ---');
   const worker2 = new Worker('localhost:50051', 'worker-2');
   worker2.register(researchAgent);
@@ -216,31 +210,30 @@ async function runDemo() {
   }
   worker2.stop();
 
-  // 結果表示
+  // 邨先棡陦ｨ遉ｺ
   const nodes = finalStatus?.completedNodes ?? {};
-  console.log('\n╔══════════════════════════════════════╗');
-  console.log('║            FINAL RESULT              ║');
-  console.log('╚══════════════════════════════════════╝\n');
+  console.log('\n笊披武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶風');
+  console.log('笊・           FINAL RESULT              笊・);
+  console.log('笊壺武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶幅\n');
   console.log(`Status: ${finalStatus?.status}`);
-  console.log(`Completed steps: ${Object.keys(nodes).join(' → ')}\n`);
+  console.log(`Completed steps: ${Object.keys(nodes).join(' 竊・')}\n`);
 
   if (nodes['llm_report']) {
-    // completedNodes の値はサーバー側でJSONパース済みのオブジェクト
-    const raw = nodes['llm_report'];
+    // completedNodes 縺ｮ蛟､縺ｯ繧ｵ繝ｼ繝舌・蛛ｴ縺ｧJSON繝代・繧ｹ貂医∩縺ｮ繧ｪ繝悶ず繧ｧ繧ｯ繝・    const raw = nodes['llm_report'];
     const report = (typeof raw === 'string' ? JSON.parse(raw) : raw) as z.infer<typeof FinalReport>;
-    console.log(`📝 Title:  ${report.title}`);
-    console.log(`📊 Score:  ${report.score}/100`);
-    console.log(`📄 Report: ${report.body}\n`);
+    console.log(`統 Title:  ${report.title}`);
+    console.log(`投 Score:  ${report.score}/100`);
+    console.log(`塘 Report: ${report.body}\n`);
   }
 
   if (nodes['llm_analyze']) {
     const raw = nodes['llm_analyze'];
     const analysis = (typeof raw === 'string' ? JSON.parse(raw) : raw) as z.infer<typeof Analysis>;
-    console.log(`🔍 Key points:`);
-    analysis.key_points.forEach((p: string) => console.log(`   • ${p}`));
+    console.log(`剥 Key points:`);
+    analysis.key_points.forEach((p: string) => console.log(`   窶｢ ${p}`));
   }
 
-  console.log('\n✅ [SUCCESS] Worker 2 skipped parse/research/analyze — only ran llm_report!');
+  console.log('\n笨・[SUCCESS] Worker 2 skipped parse/research/analyze 窶・only ran llm_report!');
   console.log('   Gemini was called exactly once for each step (no duplicate API calls)\n');
 }
 
@@ -259,3 +252,4 @@ function waitFor(pred: () => boolean | Promise<boolean>, timeout: number) {
 }
 
 runDemo().catch(console.error);
+
