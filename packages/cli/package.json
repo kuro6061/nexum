@@ -1,0 +1,13 @@
+{
+  "name": "@nexum/cli",
+  "version": "0.1.0",
+  "bin": { "nexum": "./src/index.ts" },
+  "type": "module",
+  "dependencies": {
+    "@nexum/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

@@ -1,0 +1,35 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock  # (keep for binaries, remove for libs — keep it for now)
+
+# Node
+node_modules/
+dist/
+.pnpm-store/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+
+# Nexum local data
+.nexum/local.db
+.nexum/server.log
+.nexum/server.err
+.nexum/blobs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local

@@ -1,0 +1,8 @@
+{
+  "name": "nexum",
+  "private": true,
+  "version": "0.1.0",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "protobufjs"]
+  }
+}

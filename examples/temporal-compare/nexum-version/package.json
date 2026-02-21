@@ -1,0 +1,16 @@
+{
+  "name": "nexum-llm-repair",
+  "version": "0.1.0",
+  "scripts": {
+    "start": "ts-node workflow.ts"
+  },
+  "dependencies": {
+    "@nexum/sdk": "workspace:*",
+    "zod": "^3.23"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "ts-node": "^10",
+    "@types/node": "^22"
+  }
+}

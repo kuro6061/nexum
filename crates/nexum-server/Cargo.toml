@@ -1,0 +1,26 @@
+[package]
+name = "nexum-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tonic = "0.12"
+prost = "0.13"
+sqlx = { version = "0.8", features = ["sqlite", "postgres", "any", "runtime-tokio"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+sha2 = "0.10"
+hex = "0.4"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
+tracing-opentelemetry = "0.25"
+opentelemetry = { version = "0.24", features = ["trace"] }
+opentelemetry-otlp = { version = "0.17", features = ["grpc-tonic"] }
+opentelemetry_sdk = { version = "0.24", features = ["rt-tokio"] }
+axum = "0.7"
+
+[build-dependencies]
+tonic-build = "0.12"

@@ -1,0 +1,16 @@
+{
+  "name": "nexum-subworkflow-demo",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx run.ts"
+  },
+  "dependencies": {
+    "@nexum/sdk": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "@types/node": "^22.0.0"
+  }
+}
