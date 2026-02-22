@@ -36,8 +36,9 @@ Thumbs.db
 .env.*.local
 *.env
 
-# smolagents-nexum session cache
+# Example artifacts (session cache, generated reports)
 .session-*.json
+examples/**/report.md
 
 cmd/nexum/nexum.exe
 cmd/nexum/nexum

@@ -34,7 +34,7 @@ cargo test
 
 # TypeScript integration (requires server running)
 nexum dev &
-cd examples/demo && npx tsx run.ts
+cd examples/core/demo && npx tsx run.ts
 ```
 
 ## Project Structure
@@ -44,9 +44,9 @@ nexum/
 ├── crates/nexum-server/     # Rust gRPC server (core engine)
 ├── proto/nexum.proto        # gRPC service definition
 ├── packages/
-│   ├── sdk-typescript/      # TypeScript SDK (@nexum/sdk)
-│   ├── sdk-python/          # Python SDK (nexum-sdk)
-│   └── cli/                 # nexum CLI
+━E  ├── sdk-typescript/      # TypeScript SDK (@nexum/sdk)
+━E  ├── sdk-python/          # Python SDK (nexum-sdk)
+━E  └── cli/                 # nexum CLI
 └── examples/                # Usage examples
 ```
 

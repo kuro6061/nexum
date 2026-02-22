@@ -11,7 +11,7 @@
 
 ---
 
-Nexum makes LLM agent workflows **crash-proof**. Define your agent as a typed DAG — Nexum handles retries, state persistence, exactly-once execution, and crash recovery automatically.
+Nexum makes LLM agent workflows **crash-proof**. Define your agent as a typed DAG  ENexum handles retries, state persistence, exactly-once execution, and crash recovery automatically.
 
 ```typescript
 const researchAgent = nexum.workflow<{ query: string }>('ResearchAgent')
@@ -52,7 +52,7 @@ Temporal is powerful but not LLM-native:
 | Setup | Temporal server + worker + codec | `nexum dev` (single binary) |
 | TypeScript boilerplate | ~300 lines | ~100 lines |
 
-See [`examples/temporal-compare/COMPARISON.md`](examples/temporal-compare/COMPARISON.md) for full benchmark.
+See [`examples/analysis/temporal-compare/COMPARISON.md`](examples/analysis/temporal-compare/COMPARISON.md) for full benchmark.
 
 ---
 
@@ -84,7 +84,7 @@ cd packages/cli && pnpm install && pnpm link --global
 nexum dev
 
 # Terminal 2: Run demo
-cd examples/demo && pnpm install && npx tsx run.ts
+cd examples/core/demo && pnpm install && npx tsx run.ts
 ```
 
 ---
@@ -93,8 +93,8 @@ cd examples/demo && pnpm install && npx tsx run.ts
 
 | Node | Description |
 |------|-------------|
-| `.effect()` | Side effects (API calls, DB writes) — exactly-once with auto-retry |
-| `.compute()` | Pure functions — deterministic, no retry needed |
+| `.effect()` | Side effects (API calls, DB writes)  Eexactly-once with auto-retry |
+| `.compute()` | Pure functions  Edeterministic, no retry needed |
 | `.llm()` | LLM calls with structured output enforcement |
 | `.router()` | Dynamic branching based on LLM output |
 | `.map()` | Fan-out: run handler for each item in parallel |
@@ -107,25 +107,10 @@ cd examples/demo && pnpm install && npx tsx run.ts
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐
-│           Your Application          │
-│  ┌─────────────┐  ┌──────────────┐  │
-│  │  @nexum/sdk │  │  nexum-sdk   │  │
-│  │ (TypeScript)│  │   (Python)   │  │
-│  └──────┬──────┘  └──────┬───────┘  │
-└─────────┼────────────────┼──────────┘
-          │    gRPC         │
-┌─────────▼────────────────▼──────────┐
-│           Nexum Server (Rust)        │
-│  ┌──────────┐  ┌──────────────────┐  │
-│  │ Scheduler│  │  Event Sourcing  │  │
-│  │  Engine  │  │   (SQLite/PG)    │  │
-│  └──────────┘  └──────────────────┘  │
-└─────────────────────────────────────┘
-```
+┌─────────────────────────────────────━E━E          Your Application          ━E━E ┌─────────────━E ┌──────────────━E ━E━E ━E @nexum/sdk ━E ━E nexum-sdk   ━E ━E━E ━E(TypeScript)━E ━E  (Python)   ━E ━E━E └──────┬──────━E └──────┬───────━E ━E└─────────┼────────────────┼──────────━E          ━E   gRPC         ━E┌─────────▼────────────────▼──────────━E━E          Nexum Server (Rust)        ━E━E ┌──────────━E ┌──────────────────━E ━E━E ━EScheduler━E ━E Event Sourcing  ━E ━E━E ━E Engine  ━E ━E  (SQLite/PG)    ━E ━E━E └──────────━E └──────────────────━E ━E└─────────────────────────────────────━E```
 
-- **Server**: Rust + Tonic gRPC — handles scheduling, durability, versioning
-- **SDK**: TypeScript (Zod) or Python (Pydantic) — workflow definition + worker
+- **Server**: Rust + Tonic gRPC  Ehandles scheduling, durability, versioning
+- **SDK**: TypeScript (Zod) or Python (Pydantic)  Eworkflow definition + worker
 - **Storage**: SQLite (dev) or PostgreSQL (production)
 - **IR**: Workflows compile to a deterministic DAG before execution
 
@@ -135,15 +120,15 @@ cd examples/demo && pnpm install && npx tsx run.ts
 
 | Example | Description |
 |---------|-------------|
-| `examples/demo/` | Basic effect + compute chain |
-| `examples/llm-demo/` | LLM node with structured output |
-| `examples/parallel-demo/` | Fan-out with `.effectAfter()` |
-| `examples/router-demo/` | Dynamic branching with `.router()` |
-| `examples/map-demo/` | MAP/REDUCE fan-out |
-| `examples/approval-demo/` | Human-in-the-loop approval |
-| `examples/subworkflow-demo/` | Nested workflow calls |
-| `examples/versioning-demo/` | Safe workflow version upgrades |
-| `examples/temporal-compare/` | Side-by-side Temporal comparison |
+| `examples/core/demo/` | Basic effect + compute chain |
+| `examples/core/llm-demo/` | LLM node with structured output |
+| `examples/core/parallel-demo/` | Fan-out with `.effectAfter()` |
+| `examples/core/router-demo/` | Dynamic branching with `.router()` |
+| `examples/core/map-demo/` | MAP/REDUCE fan-out |
+| `examples/core/approval-demo/` | Human-in-the-loop approval |
+| `examples/core/subworkflow-demo/` | Nested workflow calls |
+| `examples/core/versioning-demo/` | Safe workflow version upgrades |
+| `examples/analysis/temporal-compare/` | Side-by-side Temporal comparison |
 
 ---
 
@@ -203,4 +188,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT  Esee [LICENSE](LICENSE).
