@@ -1,19 +1,19 @@
 # @nexum/sdk
 
-TypeScript SDK for [Nexum](https://github.com/kuro6061/nexum) — Durable Execution Engine for LLM Agents.
+TypeScript SDK for [Nexum](https://github.com/kuro6061/nexum)  EDurable Execution Engine for LLM Agents.
 
 ## Install
 
 ```bash
-npm install nexum-sdk
+npm install nexum-js
 # or
-pnpm add nexum-sdk
+pnpm add nexum-js
 ```
 
 ## Quick Start
 
 ```typescript
-import { workflow, worker } from "nexum-sdk";
+import { workflow, worker } from "nexum-js";
 import { z } from "zod";
 
 const SearchResult = z.object({ content: z.string() });

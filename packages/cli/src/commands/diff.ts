@@ -1,4 +1,4 @@
-import { NexumClient } from 'nexum-sdk';
+import { NexumClient } from 'nexum-js';
 import { parseArgs } from 'node:util';
 
 const { values, positionals } = parseArgs({

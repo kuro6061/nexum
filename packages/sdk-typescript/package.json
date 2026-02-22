@@ -1,7 +1,7 @@
 {
-  "name": "nexum-sdk",
+  "name": "nexum-js",
   "version": "0.1.0",
-  "description": "TypeScript SDK for Nexum — Durable Execution Engine for LLM Agents",
+  "description": "TypeScript SDK for Nexum  EDurable Execution Engine for LLM Agents",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

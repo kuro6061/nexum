@@ -5,7 +5,7 @@
     "start": "ts-node workflow.ts"
   },
   "dependencies": {
-    "nexum-sdk": "workspace:*",
+    "nexum-js": "workspace:*",
     "zod": "^3.23"
   },
   "devDependencies": {

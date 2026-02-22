@@ -1,4 +1,4 @@
-import { NexumClient } from 'nexum-sdk';
+import { NexumClient } from 'nexum-js';
 
 const executionId = process.argv[3];
 if (!executionId) {
