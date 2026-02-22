@@ -33,12 +33,14 @@ submit_task.py polls GetExecution → returns output to smolagents agent
 
 - Nexum server running: `cargo run --bin nexum-server` (from repo root)
 - Python 3.10+
-- `ANTHROPIC_API_KEY` environment variable set
+- LLM API key (e.g. `GEMINI_API_KEY` for Gemini, `ANTHROPIC_API_KEY` for Claude)
+- **Windows users**: set `PYTHONIOENCODING=utf-8` to prevent encoding errors with
+  Unicode characters in web search results
 
 ## Installation
 
 ```bash
-pip install smolagents litellm anthropic grpcio protobuf pydantic
+pip install "smolagents[toolkit]" litellm grpcio protobuf pydantic
 ```
 
 ## Usage
@@ -60,7 +62,11 @@ python worker.py
 
 ```bash
 cd nexum/examples/smolagents-nexum
-python demo.py "What is the population of Tokyo and how does it compare to New York?"
+# Linux/macOS
+GEMINI_API_KEY=your-key PYTHONIOENCODING=utf-8 python demo.py "What is the population of Tokyo and how does it compare to New York?"
+
+# Windows (PowerShell)
+$env:GEMINI_API_KEY="your-key"; $env:PYTHONIOENCODING="utf-8"; python demo.py "What is the population of Tokyo and how does it compare to New York?"
 ```
 
 ## Crash Recovery Demo

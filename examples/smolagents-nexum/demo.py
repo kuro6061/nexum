@@ -107,10 +107,10 @@ def main():
         NexumVisitWebpageTool(session_id, args.crash_after_step, step_counter),
     ]
 
-    # LLM backend — uses LiteLLM to route to Anthropic Claude
+    # LLM backend — uses LiteLLM to route to Google Gemini
     model = LiteLLMModel(
-        model_id="anthropic/claude-haiku-3-5-20241022",
-        api_key=os.environ.get("ANTHROPIC_API_KEY"),
+        model_id="gemini/gemini-3-flash-preview",
+        api_key=os.environ.get("GEMINI_API_KEY"),
     )
 
     agent = ToolCallingAgent(

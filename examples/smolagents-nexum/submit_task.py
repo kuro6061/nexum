@@ -71,7 +71,7 @@ def submit_tool_call(
         status = client.get_status(exec_id)
         if status["status"] == "COMPLETED":
             result = status["completedNodes"].get("tool_call", {}).get("result", "")
-            print(f"[Nexum] {key} already COMPLETED (cached) ✓")
+            print(f"[Nexum] {key} already COMPLETED (cached) [done]")
             client.close()
             return result
         if status["status"] in ("FAILED", "CANCELLED"):
@@ -101,7 +101,7 @@ def submit_tool_call(
         st = status["status"]
         if st == "COMPLETED":
             result = status["completedNodes"].get("tool_call", {}).get("result", "")
-            print(f"[Nexum] {exec_id[:20]}... COMPLETED ✓")
+            print(f"[Nexum] {exec_id[:20]}... COMPLETED [done]")
             client.close()
             return result
         if st in ("FAILED", "CANCELLED"):
