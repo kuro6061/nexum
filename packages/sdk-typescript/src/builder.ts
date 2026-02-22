@@ -32,6 +32,17 @@ export interface BuiltWorkflow {
   handlers: Record<string, NodeDef>;
 }
 
+/**
+ * Fluent builder for defining a Nexum workflow.
+ *
+ * @example
+ * ```ts
+ * const wf = nexum.workflow<{ query: string }>('my-workflow')
+ *   .effect('search', SearchResult, async ctx => fetchData(ctx.input.query))
+ *   .compute('summarize', Summary, ctx => summarize(ctx.get('search')))
+ *   .build();
+ * ```
+ */
 export class WorkflowBuilder<
   TInput extends Record<string, any> = Record<string, any>,
   TNodes extends Record<string, any> = {}
@@ -41,10 +52,16 @@ export class WorkflowBuilder<
 
   constructor(public readonly workflowId: string) {}
 
+  /** Declare the input type for this workflow (type-level only, no runtime effect). */
   input<T extends Record<string, any>>(): WorkflowBuilder<T, TNodes> {
     return this as any;
   }
 
+  /**
+   * Add a **COMPUTE** node — a pure, deterministic function.
+   * Depends on all preceding nodes by default.
+   * Compute nodes are not retried on failure.
+   */
   compute<K extends string, TSchema extends z.ZodTypeAny>(
     id: K,
     schema: TSchema,
@@ -61,6 +78,11 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /**
+   * Add an **EFFECT** node — a side-effectful async operation (API call, DB write, etc.).
+   * Executed with **exactly-once** semantics and automatic retry with exponential backoff.
+   * Depends on all preceding nodes by default.
+   */
   effect<K extends string, TSchema extends z.ZodTypeAny>(
     id: K,
     schema: TSchema,
@@ -77,6 +99,10 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /**
+   * Add a **HUMAN_APPROVAL** node — pauses the workflow until a human approves or rejects.
+   * Use `nexum approve <executionId> <nodeId>` or the CLI `nexum approvals` to act on pending requests.
+   */
   humanApproval<K extends string>(
     id: K,
     _options?: { approvers?: string[]; message?: string }
@@ -99,6 +125,7 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /** Add a **COMPUTE** node with explicit dependencies instead of the default sequential chain. */
   computeAfter<K extends string, TSchema extends z.ZodTypeAny>(
     id: K,
     dependsOn: string[],
@@ -116,6 +143,10 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /**
+   * Add a **ROUTER** node — dynamically routes execution to one branch based on LLM output or logic.
+   * Only the selected branch is executed; all other branches are skipped.
+   */
   router<K extends string>(
     id: K,
     routes: Array<{ condition: string; target: string }>,
@@ -151,6 +182,7 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /** Add an **EFFECT** node with explicit dependencies (fan-in, parallel join). */
   effectAfter<K extends string, TSchema extends z.ZodTypeAny>(
     id: K,
     dependsOn: string[],
@@ -168,6 +200,10 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /**
+   * Add a **MAP** node — fans out over a list, executing the handler for each item in parallel.
+   * Pair with `.reduce()` to aggregate results.
+   */
   map<K extends string, TItem, TOut extends z.ZodTypeAny>(
     id: K,
     outputSchema: TOut,
@@ -188,6 +224,10 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /**
+   * Add a **REDUCE** node — aggregates results from the preceding MAP node.
+   * Must immediately follow a `.map()` call.
+   */
   reduce<K extends string, TOut extends z.ZodTypeAny>(
     id: K,
     outputSchema: TOut,
@@ -208,6 +248,10 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /**
+   * Add a **SUBWORKFLOW** node — invokes another workflow as a step.
+   * The parent workflow waits for the child to complete before proceeding.
+   */
   subworkflow<K extends string, TOut extends z.ZodTypeAny>(
     id: K,
     outputSchema: TOut,
@@ -229,6 +273,16 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /**
+   * Add a **TIMER** node — waits for a specified duration before proceeding.
+   * The server handles the delay durably; no worker is needed.
+   *
+   * @example
+   * ```ts
+   * .timer('wait-5min', { delaySeconds: 300 })
+   * .timer('send-at', { scheduledAt: new Date('2026-01-01T09:00:00Z') })
+   * ```
+   */
   timer<K extends string>(
     id: K,
     options: { delaySeconds: number } | { scheduledAt: Date }
@@ -254,6 +308,11 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  /**
+   * Compile the workflow definition into a `BuiltWorkflow`.
+   * Computes a deterministic SHA-256 `versionHash` from the IR JSON,
+   * enabling safe version upgrades and exactly-once execution.
+   */
   build(): BuiltWorkflow {
     const irNodes: Record<string, any> = {};
     for (const [id, def] of Object.entries(this.nodes)) {
@@ -278,7 +337,21 @@ export class WorkflowBuilder<
   }
 }
 
+/**
+ * Entry point for the Nexum SDK.
+ *
+ * @example
+ * ```ts
+ * import { nexum } from 'nexum-js';
+ *
+ * const myWorkflow = nexum.workflow('my-workflow')
+ *   .effect('fetch', FetchResult, async ctx => fetch(ctx.input.url))
+ *   .compute('process', ProcessResult, ctx => process(ctx.get('fetch')))
+ *   .build();
+ * ```
+ */
 export const nexum = {
+  /** Create a new workflow builder with the given workflow ID. */
   workflow: <TInput extends Record<string, any> = Record<string, any>>(id: string) =>
     new WorkflowBuilder<TInput>(id),
 };

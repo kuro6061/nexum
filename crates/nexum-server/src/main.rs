@@ -650,7 +650,7 @@ impl NexumServer {
                     .bind(&event_id)
                     .bind(&parent_exec_id)
                     .bind(seq)
-                    .bind(serde_json::to_string(&payload).unwrap())
+                    .bind(serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_string()))
                     .execute(&self.db)
                     .await
                     .map_err(|e| Status::internal(e.to_string()))?;
@@ -731,7 +731,8 @@ impl NexumServer {
             "size": output_json.len(),
             "path": blob_path.to_string_lossy()
         });
-        Ok(serde_json::to_string(&pointer).unwrap())
+        serde_json::to_string(&pointer)
+            .map_err(|e| Status::internal(format!("Failed to serialize claim check pointer: {}", e)))
     }
 
     async fn resolve_payload(&self, stored_json: &str) -> Result<String, Status> {
@@ -2085,9 +2086,17 @@ async fn main() -> Result<()> {
                 async move { m.prometheus_text() }
             }))
             .route("/health", axum::routing::get(|| async { "ok" }));
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:9090").await.unwrap();
+        let listener = match tokio::net::TcpListener::bind("0.0.0.0:9090").await {
+            Ok(l) => l,
+            Err(e) => {
+                tracing::warn!("Metrics server failed to bind on port 9090: {} (continuing without metrics)", e);
+                return;
+            }
+        };
         tracing::info!("Metrics server on http://0.0.0.0:9090/metrics");
-        axum::serve(listener, app).await.unwrap();
+        if let Err(e) = axum::serve(listener, app).await {
+            tracing::error!("Metrics server error: {}", e);
+        }
     });
 
     let addr = "[::1]:50051".parse()?;

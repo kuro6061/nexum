@@ -40,6 +40,28 @@ class WorkflowDef:
 
 
 class WorkflowBuilder:
+    """
+    Fluent builder for defining a Nexum workflow.
+
+    Example::
+
+        from nexum.builder import workflow
+        from pydantic import BaseModel
+
+        class SearchResult(BaseModel):
+            content: str
+
+        class Summary(BaseModel):
+            text: str
+
+        wf = (
+            workflow("my-workflow")
+            .effect("search", SearchResult, fetch_data)
+            .compute("summarize", Summary, summarize)
+            .build()
+        )
+    """
+
     def __init__(self, workflow_id: str):
         self.workflow_id = workflow_id
         self._nodes: list[NodeDef] = []
@@ -57,6 +79,17 @@ class WorkflowBuilder:
         *,
         depends_on: list[str] | None = None,
     ) -> WorkflowBuilder:
+        """
+        Add an **EFFECT** node — a side-effectful async operation (API call, DB write, etc.).
+
+        Executed with **exactly-once** semantics and automatic retry.
+        Depends on all preceding nodes by default; use ``depends_on`` for explicit fan-in.
+
+        :param node_id: Unique node identifier within this workflow.
+        :param output_model: Pydantic BaseModel class defining the output schema.
+        :param handler: Async callable receiving a ``ContextView`` and returning ``output_model``.
+        :param depends_on: Explicit list of node IDs to depend on (overrides sequential default).
+        """
         deps = depends_on if depends_on is not None else self._current_deps()
         self._nodes.append(NodeDef(node_id, "EFFECT", output_model, handler, deps))
         self._node_order.append(node_id)
@@ -70,6 +103,17 @@ class WorkflowBuilder:
         *,
         depends_on: list[str] | None = None,
     ) -> WorkflowBuilder:
+        """
+        Add a **COMPUTE** node — a pure, deterministic function.
+
+        Compute nodes are not retried on failure (use ``effect`` for fallible operations).
+        Depends on all preceding nodes by default.
+
+        :param node_id: Unique node identifier within this workflow.
+        :param output_model: Pydantic BaseModel class defining the output schema.
+        :param handler: Callable receiving a ``ContextView`` and returning ``output_model``.
+        :param depends_on: Explicit list of node IDs to depend on.
+        """
         deps = depends_on if depends_on is not None else self._current_deps()
         self._nodes.append(NodeDef(node_id, "COMPUTE", output_model, handler, deps))
         self._node_order.append(node_id)
@@ -82,12 +126,29 @@ class WorkflowBuilder:
         *,
         depends_on: list[str] | None = None,
     ) -> WorkflowBuilder:
+        """
+        Add a **TIMER** node — waits for a specified duration before proceeding.
+
+        The server handles the delay durably; no worker is needed.
+
+        :param node_id: Unique node identifier.
+        :param delay_seconds: Number of seconds to wait before scheduling the next node.
+        :param depends_on: Explicit list of node IDs to depend on.
+        """
         deps = depends_on if depends_on is not None else self._current_deps()
         self._nodes.append(NodeDef(node_id, "TIMER", None, None, deps, delay_seconds=delay_seconds))
         self._node_order.append(node_id)
         return self
 
     def build(self) -> WorkflowDef:
+        """
+        Compile the workflow definition into a :class:`WorkflowDef`.
+
+        Computes a deterministic SHA-256 ``version_hash`` from the IR JSON,
+        enabling safe version upgrades and exactly-once execution semantics.
+
+        :returns: A :class:`WorkflowDef` ready to be registered with :class:`~nexum.client.NexumClient`.
+        """
         # Build IR JSON matching the TypeScript SDK format
         ir_nodes: dict[str, Any] = {}
         for n in self._nodes:
@@ -104,4 +165,14 @@ class WorkflowBuilder:
 
 
 def workflow(workflow_id: str) -> WorkflowBuilder:
+    """
+    Entry point for the Nexum Python SDK. Returns a :class:`WorkflowBuilder`.
+
+    :param workflow_id: Globally unique identifier for this workflow.
+
+    Example::
+
+        from nexum.builder import workflow
+        wf = workflow("my-workflow").effect(...).compute(...).build()
+    """
     return WorkflowBuilder(workflow_id)
