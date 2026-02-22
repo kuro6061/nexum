@@ -38,3 +38,6 @@ Documentation = "https://github.com/kuro6061/nexum#readme"
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["nexum"]
