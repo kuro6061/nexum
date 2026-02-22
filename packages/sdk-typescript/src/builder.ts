@@ -20,8 +20,8 @@ export interface ExecutionContext<
   TNodes extends Record<string, any>
 > {
   input: TInput;
-  get<K extends keyof TNodes>(nodeId: K): TNodes[K];
-  getMapResults<K extends keyof TNodes>(mapNodeId: K): TNodes[K];
+  get<K extends string & keyof TNodes>(nodeId: K): TNodes[K];
+  getMapResults<K extends string & keyof TNodes>(mapNodeId: K): TNodes[K];
 }
 
 export interface BuiltWorkflow {
