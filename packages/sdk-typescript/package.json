@@ -1,9 +1,32 @@
 {
   "name": "@nexum/sdk",
   "version": "0.1.0",
+  "description": "TypeScript SDK for Nexum — Durable Execution Engine for LLM Agents",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rimraf dist"
+  },
+  "keywords": ["llm", "agents", "durable-execution", "workflow", "orchestration", "nexum"],
+  "license": "MIT",
+  "homepage": "https://github.com/kuro6061/nexum",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kuro6061/nexum.git",
+    "directory": "packages/sdk-typescript"
+  },
+  "bugs": {
+    "url": "https://github.com/kuro6061/nexum/issues"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
@@ -15,7 +38,11 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/uuid": "^10.0.0",
+    "rimraf": "^6.0.0",
     "typescript": "^5.0.0",
     "tsx": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

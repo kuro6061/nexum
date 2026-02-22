@@ -2,6 +2,11 @@
   "name": "nexum",
   "private": true,
   "version": "0.1.0",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "pnpm -r run build",
+    "clean": "pnpm -r run clean"
+  },
   "pnpm": {
     "onlyBuiltDependencies": ["esbuild", "protobufjs"]
   }

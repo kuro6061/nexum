@@ -1,13 +1,38 @@
 {
   "name": "@nexum/cli",
   "version": "0.1.0",
-  "bin": { "nexum": "./src/index.ts" },
+  "description": "CLI for Nexum — Durable Execution Engine for LLM Agents",
   "type": "module",
+  "bin": {
+    "nexum": "./dist/index.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rimraf dist"
+  },
+  "keywords": ["llm", "agents", "durable-execution", "workflow", "nexum", "cli"],
+  "license": "MIT",
+  "homepage": "https://github.com/kuro6061/nexum",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kuro6061/nexum.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/kuro6061/nexum/issues"
+  },
   "dependencies": {
     "@nexum/sdk": "workspace:*"
   },
   "devDependencies": {
+    "rimraf": "^6.0.0",
+    "typescript": "^5.0.0",
     "tsx": "^4.0.0",
     "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
