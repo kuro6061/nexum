@@ -26,6 +26,8 @@ python demo.py "your query"
 |-------------|-----------|-------------|
 | `autogen-nexum/` | Microsoft AutoGen v0.4 | Durable tool calls for AutoGen agents — crash recovery + cached re-runs |
 | `pydantic-ai-nexum/` | Pydantic AI | Durable `@agent.tool_plain` calls — SQLite-backed persistence for any model |
+| `openai-agents-nexum/` | OpenAI Agents SDK | Durable `@function_tool` calls — crash recovery for OpenAI/Gemini agents |
+| `browser-use-nexum/` | browser-use | Durable browser sessions — multi-step research pipeline with crash recovery |
 | `smolagents-nexum/` | HuggingFace smolagents | Tool execution persistence for `ToolCallingAgent` |
 | `crawl4ai-nexum/` | crawl4ai | Resilient web crawling with exactly-once page fetches |
 | `deep-research-nexum/` | custom | Multi-step research pipeline with crash recovery |
