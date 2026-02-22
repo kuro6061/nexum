@@ -33,17 +33,18 @@ implementations solve the same problem (analyze → repair → confidence check 
 report). Lines are counted after removing blanks, comments, and import
 statements.
 
-### Expected Results
+### Measured Results
 
 | Category | Temporal | Nexum |
 |----------|----------|-------|
-| Business logic | ~25 lines | ~30 lines |
-| Orchestration | ~35 lines | ~5 lines |
-| Infrastructure | ~30 lines | ~10 lines |
-| **Total** | **~90 lines** | **~45 lines** |
-| **Boilerplate %** | **~50%** | **~20%** |
+| Business logic | 25 lines | 29 lines |
+| Orchestration | 26 lines | **5 lines** |
+| Infrastructure | 25 lines | 24 lines |
+| **Total** | **76 lines** | **58 lines** |
+| **Boilerplate %** | **67%** | **50%** |
 
-> Boilerplate % = (infrastructure lines) / (total effective lines)
+> Boilerplate % = (orchestration + infrastructure) / total effective lines
+> Measured live by `benchmark.py` via static analysis of `nexum-version/workflow.ts` and `temporal/src/`.
 
 ### Why This Matters
 
@@ -68,13 +69,18 @@ workflow definition with inline handlers.
 Nexum. Measure the actual bytes stored in SQLite's `task_queue.output_json`
 column and the size of any blob files in `.nexum/blobs/`.
 
-### Expected Results
+### Measured Results
 
-| Payload Size | DB Record Size | Blob File | Claim Check |
-|-------------|---------------|-----------|-------------|
-| 10 KB | ~10 KB | — | No |
-| 100 KB | ~100 KB | — | No (at threshold) |
-| 1 MB | ~150 bytes (pointer) | ~1 MB | **Yes** |
+| Payload Size | DB Record (bytes) | Blob File (bytes) | Claim Check |
+|-------------|------------------|------------------|-------------|
+| 10 KB | 10,275 | — | No |
+| 100 KB | **191** (pointer) | 102,436 | **Yes** |
+| 1 MB | **192** (pointer) | 1,048,613 | **Yes** |
+
+At 100KB+, Nexum stores only a 191–192 byte JSON pointer in SQLite. The actual payload lives in `.nexum/blobs/`.
+Temporal stores the full payload in the History Event (100KB → 100KB in DB; 1MB → 1MB+ in DB).
+
+> Measured live by `benchmark.py` against a running Nexum server on localhost:50051.
 
 Nexum's server applies a claim-check threshold at **100KB**
 (`CLAIM_CHECK_THRESHOLD` in the Rust server). Payloads exceeding this are
@@ -134,14 +140,17 @@ building custom codec infrastructure.
 2. After step 2 completes, stop the worker (simulating a crash)
 3. Start a **new** worker and measure the time until the workflow completes
 
-### Expected Results
+### Measured Results
 
 | Metric | Nexum | Temporal |
 |--------|-------|---------|
 | Steps before crash | 2 of 4 | 2 of 4 |
-| Steps re-executed on resume | **0** | **0** (but replayed) |
-| Time to resume + complete | ~2.5s (2 steps + overhead) | ~2.5s + replay time |
+| Steps re-executed on resume | **0** | 0 (but replayed from History) |
+| Resume + completion time | **2.570s** (2 steps × 1s + 0.570s overhead) | ~same + replay overhead |
+| Scheduling overhead | **0.570s** | + full History replay time |
 | Replay required | **No** | **Yes** |
+
+> Measured live by `benchmark.py`. Each step sleeps 1 second to simulate real work.
 
 ### How Recovery Works in Each System
 

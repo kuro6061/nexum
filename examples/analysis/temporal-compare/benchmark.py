@@ -173,13 +173,14 @@ def bench_boilerplate() -> dict:
     # --- Temporal ---
     t_cats = _categorize_temporal_lines()
     t_total_eff = sum(v[1] for v in t_cats.values())
-    t_infra_eff = t_cats["infrastructure"][1]
+    # Boilerplate = orchestration + infrastructure (everything that isn't business logic)
+    t_infra_eff = t_cats["infrastructure"][1] + t_cats["orchestration"][1]
     t_ratio = t_infra_eff / t_total_eff * 100 if t_total_eff else 0
 
     # --- Nexum ---
     n_cats = _categorize_nexum_lines()
     n_total_eff = sum(v[1] for v in n_cats.values())
-    n_infra_eff = n_cats["infrastructure"][1]
+    n_infra_eff = n_cats["infrastructure"][1] + n_cats["orchestration"][1]
     n_ratio = n_infra_eff / n_total_eff * 100 if n_total_eff else 0
 
     table = Table(title="Effective Lines (blank/comment/import excluded)")
@@ -246,18 +247,26 @@ def _measure_db_size(exec_id: str) -> dict:
     conn = sqlite3.connect(str(NEXUM_DB))
     cursor = conn.cursor()
 
-    # Check task_queue for output_json size
+    # Output is stored in events table as NodeCompleted payload
     cursor.execute(
-        "SELECT output_json FROM task_queue WHERE execution_id = ? AND status = 'DONE'",
+        "SELECT payload FROM events WHERE execution_id = ? AND event_type = 'NodeCompleted' LIMIT 1",
         (exec_id,),
     )
     row = cursor.fetchone()
     conn.close()
 
     if not row or not row[0]:
-        return {"db_output_bytes": 0, "blob_file_bytes": 0, "claim_check": False}
+        return {"db_output_bytes": -1, "blob_file_bytes": 0, "claim_check": False}
 
-    output_json = row[0]
+    # payload = {"node_id": "...", "output": {...}}
+    # Extract the output field size
+    try:
+        parsed_event = json.loads(row[0])
+        output_obj = parsed_event.get("output", {})
+        output_json = json.dumps(output_obj)
+    except Exception:
+        output_json = row[0]
+
     db_bytes = len(output_json.encode("utf-8"))
 
     # Check if it's a claim check pointer
