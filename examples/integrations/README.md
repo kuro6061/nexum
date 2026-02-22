@@ -28,6 +28,7 @@ python demo.py "your query"
 | `pydantic-ai-nexum/` | Pydantic AI | Durable `@agent.tool_plain` calls — SQLite-backed persistence for any model |
 | `openai-agents-nexum/` | OpenAI Agents SDK | Durable `@function_tool` calls — crash recovery for OpenAI/Gemini agents |
 | `browser-use-nexum/` | browser-use | Durable browser sessions — multi-step research pipeline with crash recovery |
+| `langgraph-nexum/` | LangGraph | Exactly-once `@tool` execution — complements LangGraph checkpointing |
 | `smolagents-nexum/` | HuggingFace smolagents | Tool execution persistence for `ToolCallingAgent` |
 | `crawl4ai-nexum/` | crawl4ai | Resilient web crawling with exactly-once page fetches |
 | `deep-research-nexum/` | custom | Multi-step research pipeline with crash recovery |
