@@ -139,6 +139,20 @@ export class Worker {
   }) {
     const nodeDef = task.workflow.handlers[task.nodeId];
 
+    // TIMER: auto-completed server-side during poll; if we get here, complete it
+    if (task.nodeType === 'TIMER' || nodeDef?.type === 'TIMER') {
+      const delaySeconds = nodeDef?.delaySeconds ?? 0;
+      await this.completeTaskRpc!({
+        taskId: task.taskId,
+        outputJson: JSON.stringify({
+          waited_until: new Date().toISOString(),
+          delay_seconds: delaySeconds,
+        }),
+      });
+      console.log(`[NEXUM] \u23F1 TIMER completed: ${task.nodeId} (${delaySeconds}s)`);
+      return;
+    }
+
     // HUMAN_APPROVAL: don't execute, just wait for external approval
     if (nodeDef?.type === 'HUMAN_APPROVAL') {
       console.log(`[NEXUM] \u23F8 Waiting for human approval: ${task.nodeId} (execution: ${task.executionId})`);

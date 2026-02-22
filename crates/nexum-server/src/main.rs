@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 use tonic::{transport::Server, Request, Response, Status};
 use opentelemetry::trace::TracerProvider as _;
 use tracing_subscriber::util::SubscriberInitExt;
+use chrono::Utc;
 use uuid::Uuid;
 
 pub mod nexum_proto {
@@ -486,27 +487,77 @@ impl NexumServer {
                     .and_then(|t| t.as_str())
                     .unwrap_or("COMPUTE");
 
-                sqlx::query(
-                    "INSERT INTO task_queue (task_id, execution_id, node_id, version_hash, idempotency_key, status, node_type)
-                     VALUES (?, ?, ?, ?, ?, 'READY', ?)"
-                )
-                .bind(&task_id)
-                .bind(execution_id)
-                .bind(node_id)
-                .bind(version_hash)
-                .bind(&idempotency_key)
-                .bind(ir_node_type)
-                .execute(&self.db)
-                .await
-                .map_err(|e| Status::internal(e.to_string()))?;
+                // TIMER nodes: set scheduled_at in the future based on delay_seconds
+                if ir_node_type == "TIMER" {
+                    let delay_secs = node_def
+                        .get("delay_seconds")
+                        .and_then(|d| d.as_i64())
+                        .unwrap_or(0);
 
-                tracing::info!(
-                    execution_id = execution_id,
-                    node_id = node_id,
-                    task_id = task_id,
-                    node_type = ir_node_type,
-                    "Scheduled task"
-                );
+                    let insert_sql = if self.is_postgres {
+                        format!(
+                            "INSERT INTO task_queue (task_id, execution_id, node_id, version_hash, idempotency_key, status, node_type, scheduled_at)
+                             VALUES (?, ?, ?, ?, ?, 'READY', 'TIMER', NOW() + INTERVAL '{} seconds')",
+                            delay_secs
+                        )
+                    } else {
+                        "INSERT INTO task_queue (task_id, execution_id, node_id, version_hash, idempotency_key, status, node_type, scheduled_at)
+                         VALUES (?, ?, ?, ?, ?, 'READY', 'TIMER', datetime('now', ? || ' seconds'))".to_string()
+                    };
+
+                    if self.is_postgres {
+                        sqlx::query(&insert_sql)
+                            .bind(&task_id)
+                            .bind(execution_id)
+                            .bind(node_id)
+                            .bind(version_hash)
+                            .bind(&idempotency_key)
+                            .execute(&self.db)
+                            .await
+                            .map_err(|e| Status::internal(e.to_string()))?;
+                    } else {
+                        sqlx::query(&insert_sql)
+                            .bind(&task_id)
+                            .bind(execution_id)
+                            .bind(node_id)
+                            .bind(version_hash)
+                            .bind(&idempotency_key)
+                            .bind(format!("+{}", delay_secs))
+                            .execute(&self.db)
+                            .await
+                            .map_err(|e| Status::internal(e.to_string()))?;
+                    }
+
+                    tracing::info!(
+                        execution_id = execution_id,
+                        node_id = node_id,
+                        task_id = task_id,
+                        delay_seconds = delay_secs,
+                        "Scheduled TIMER task"
+                    );
+                } else {
+                    sqlx::query(
+                        "INSERT INTO task_queue (task_id, execution_id, node_id, version_hash, idempotency_key, status, node_type)
+                         VALUES (?, ?, ?, ?, ?, 'READY', ?)"
+                    )
+                    .bind(&task_id)
+                    .bind(execution_id)
+                    .bind(node_id)
+                    .bind(version_hash)
+                    .bind(&idempotency_key)
+                    .bind(ir_node_type)
+                    .execute(&self.db)
+                    .await
+                    .map_err(|e| Status::internal(e.to_string()))?;
+
+                    tracing::info!(
+                        execution_id = execution_id,
+                        node_id = node_id,
+                        task_id = task_id,
+                        node_type = ir_node_type,
+                        "Scheduled task"
+                    );
+                }
             }
         }
 
@@ -983,6 +1034,79 @@ impl NexumService for NexumServer {
                 } else {
                     node_id.clone()
                 };
+
+                // TIMER nodes: auto-complete server-side, no worker needed
+                if node_type == "TIMER" {
+                    // Read delay_seconds from IR
+                    let delay_secs = ir
+                        .and_then(|ir_val| ir_val.get("nodes"))
+                        .and_then(|n| n.get(&node_id))
+                        .and_then(|n| n.get("delay_seconds"))
+                        .and_then(|d| d.as_i64())
+                        .unwrap_or(0);
+
+                    let output = serde_json::json!({
+                        "waited_until": Utc::now().to_rfc3339(),
+                        "delay_seconds": delay_secs,
+                    });
+
+                    // Mark task DONE
+                    sqlx::query("UPDATE task_queue SET status = 'DONE' WHERE task_id = ?")
+                        .bind(&task_id)
+                        .execute(&self.db)
+                        .await
+                        .map_err(|e| Status::internal(e.to_string()))?;
+
+                    self.metrics.tasks_completed.fetch_add(1, Ordering::Relaxed);
+
+                    // Insert NodeCompleted event
+                    let event_id = format!("evt-{}", Uuid::new_v4());
+                    let seq_id = self.get_next_sequence_id(&execution_id).await?;
+                    let payload = serde_json::json!({
+                        "node_id": node_id,
+                        "output": output,
+                    });
+                    sqlx::query(
+                        "INSERT INTO events (event_id, execution_id, sequence_id, event_type, payload)
+                         VALUES (?, ?, ?, 'NodeCompleted', ?)"
+                    )
+                    .bind(&event_id)
+                    .bind(&execution_id)
+                    .bind(seq_id)
+                    .bind(serde_json::to_string(&payload).unwrap_or_default())
+                    .execute(&self.db)
+                    .await
+                    .map_err(|e| Status::internal(e.to_string()))?;
+
+                    tracing::info!(
+                        execution_id = %execution_id,
+                        node_id = %node_id,
+                        delay_seconds = delay_secs,
+                        "TIMER auto-completed"
+                    );
+
+                    // Schedule downstream nodes
+                    self.schedule_ready_nodes(&execution_id, &workflow_id, &version_hash).await?;
+                    self.check_execution_complete(&execution_id, &workflow_id, &version_hash).await?;
+
+                    // Return empty response — no task for worker to process
+                    return Ok(Response::new(PollResponse {
+                        has_task: false,
+                        task_id: String::new(),
+                        execution_id: String::new(),
+                        node_id: String::new(),
+                        input_json: String::new(),
+                        idempotency_key: String::new(),
+                        node_type: String::new(),
+                        map_item_json: String::new(),
+                        is_map_subtask: false,
+                        map_index: 0,
+                        map_total: 0,
+                        sub_execution_id: String::new(),
+                        sub_workflow_id: String::new(),
+                        sub_input_json: String::new(),
+                    }));
+                }
 
                 // For HUMAN_APPROVAL nodes, set approval_status to PENDING
                 if node_type == "HUMAN_APPROVAL" {

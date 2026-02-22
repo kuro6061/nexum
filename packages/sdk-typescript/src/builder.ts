@@ -3,7 +3,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { createHash } from 'crypto';
 
 export interface NodeDef {
-  type: 'COMPUTE' | 'EFFECT' | 'ROUTER' | 'HUMAN_APPROVAL' | 'MAP' | 'REDUCE' | 'SUBWORKFLOW';
+  type: 'COMPUTE' | 'EFFECT' | 'ROUTER' | 'HUMAN_APPROVAL' | 'MAP' | 'REDUCE' | 'SUBWORKFLOW' | 'TIMER';
   dependencies: string[];
   outputSchema: object;
   zodSchema: z.ZodTypeAny;
@@ -13,6 +13,7 @@ export interface NodeDef {
   mapNodeId?: string;
   subWorkflowId?: string;
   inputFn?: (ctx: ExecutionContext<any, any>) => Record<string, unknown>;
+  delaySeconds?: number;
 }
 
 export interface ExecutionContext<
@@ -228,6 +229,31 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  timer<K extends string>(
+    id: K,
+    options: { delaySeconds: number } | { scheduledAt: Date }
+  ): WorkflowBuilder<TInput, TNodes & Record<K, { waited_until: string; delay_seconds: number }>> {
+    const delaySeconds = 'delaySeconds' in options
+      ? options.delaySeconds
+      : Math.max(0, Math.floor((options.scheduledAt.getTime() - Date.now()) / 1000));
+    this.nodes[id] = {
+      type: 'TIMER',
+      dependencies: [...this.nodeOrder],
+      outputSchema: {
+        type: 'object',
+        properties: {
+          waited_until: { type: 'string' },
+          delay_seconds: { type: 'number' },
+        },
+      },
+      zodSchema: z.object({ waited_until: z.string(), delay_seconds: z.number() }),
+      handler: () => { throw new Error('TIMER nodes are handled by the server'); },
+      delaySeconds,
+    };
+    this.nodeOrder.push(id);
+    return this as any;
+  }
+
   build(): BuiltWorkflow {
     const irNodes: Record<string, any> = {};
     for (const [id, def] of Object.entries(this.nodes)) {
@@ -238,6 +264,7 @@ export class WorkflowBuilder<
         ...(def.mapNodeId ? { mapNodeId: def.mapNodeId } : {}),
         ...(def.subWorkflowId ? { subWorkflowId: def.subWorkflowId } : {}),
         ...(def.inputFn ? { inputFn: def.inputFn.toString() } : {}),
+        ...(def.delaySeconds !== undefined ? { delay_seconds: def.delaySeconds } : {}),
       };
     }
     const irJson = JSON.stringify({ nodes: irNodes });

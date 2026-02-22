@@ -93,6 +93,17 @@ class Worker:
         if node is None:
             raise RuntimeError(f"Unknown node: {task.node_id}")
 
+        # TIMER: auto-completed server-side; if we get here, complete it
+        if node.type == "TIMER":
+            from datetime import datetime, timezone
+            output = {
+                "waited_until": datetime.now(timezone.utc).isoformat(),
+                "delay_seconds": node.delay_seconds or 0,
+            }
+            self._client.complete_task(task.task_id, output)
+            logger.info(f"[NEXUM] TIMER {node.id} → completed ({node.delay_seconds}s)")
+            return
+
         # Parse input_json — server sends { input: {...}, deps: {...} }
         input_data_raw = json.loads(task.input_json) if task.input_json else {}
         input_data = input_data_raw.get("input", input_data_raw)
