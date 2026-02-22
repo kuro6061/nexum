@@ -1,5 +1,5 @@
 {
-  "name": "@nexum/cli",
+  "name": "nexum-cli",
   "version": "0.1.0",
   "description": "CLI for Nexum — Durable Execution Engine for LLM Agents",
   "type": "module",
@@ -24,7 +24,7 @@
     "url": "https://github.com/kuro6061/nexum/issues"
   },
   "dependencies": {
-    "@nexum/sdk": "workspace:*"
+    "nexum-sdk": "workspace:*"
   },
   "devDependencies": {
     "rimraf": "^6.0.0",

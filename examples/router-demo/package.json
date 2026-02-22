@@ -6,7 +6,7 @@
     "start": "tsx run.ts"
   },
   "dependencies": {
-    "@nexum/sdk": "workspace:*",
+    "nexum-sdk": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

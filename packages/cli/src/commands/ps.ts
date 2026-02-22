@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util';
-import { NexumClient } from '@nexum/sdk';
+import { NexumClient } from 'nexum-sdk';
 
 const { values } = parseArgs({
   options: {

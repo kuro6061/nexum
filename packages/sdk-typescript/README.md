@@ -5,15 +5,15 @@ TypeScript SDK for [Nexum](https://github.com/kuro6061/nexum) — Durable Execut
 ## Install
 
 ```bash
-npm install @nexum/sdk
+npm install nexum-sdk
 # or
-pnpm add @nexum/sdk
+pnpm add nexum-sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { workflow, worker } from "@nexum/sdk";
+import { workflow, worker } from "nexum-sdk";
 import { z } from "zod";
 
 const SearchResult = z.object({ content: z.string() });

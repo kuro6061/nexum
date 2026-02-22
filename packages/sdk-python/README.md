@@ -5,7 +5,7 @@ Python SDK for [Nexum](https://github.com/kuro6061/nexum) — Durable Execution 
 ## Install
 
 ```bash
-pip install nexum-sdk
+pip install nexum-py
 ```
 
 ## Quick Start

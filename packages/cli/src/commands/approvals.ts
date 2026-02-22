@@ -1,4 +1,4 @@
-import { NexumClient } from '@nexum/sdk';
+import { NexumClient } from 'nexum-sdk';
 
 const client = new NexumClient();
 const items = await client.getPendingApprovals();

@@ -28,13 +28,13 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Publish @nexum/sdk
+      - name: Publish nexum-sdk
         run: pnpm publish --no-git-checks --access public
         working-directory: packages/sdk-typescript
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @nexum/cli
+      - name: Publish nexum-cli
         run: pnpm publish --no-git-checks --access public
         working-directory: packages/cli
         env:
