@@ -1,0 +1,138 @@
+syntax = "proto3";
+package nexum;
+
+service NexumService {
+  rpc RegisterWorkflow(WorkflowIR) returns (AckResponse);
+  rpc StartExecution(StartRequest) returns (StartResponse);
+  rpc PollTask(PollRequest) returns (PollResponse);
+  rpc CompleteTask(CompleteRequest) returns (AckResponse);
+  rpc FailTask(FailRequest) returns (AckResponse);
+  rpc GetStatus(StatusRequest) returns (StatusResponse);
+  rpc ListExecutions(ListRequest) returns (ListResponse);
+  rpc CancelExecution(CancelRequest) returns (AckResponse);
+  rpc ListWorkflowVersions(ListVersionsRequest) returns (ListVersionsResponse);
+  rpc ApproveTask(ApproveRequest) returns (AckResponse);
+  rpc RejectTask(RejectRequest) returns (AckResponse);
+  rpc GetPendingApprovals(EmptyRequest) returns (PendingApprovalsResponse);
+}
+
+message WorkflowIR {
+  string workflow_id = 1;
+  string version_hash = 2;
+  string ir_json = 3;
+}
+
+message AckResponse {
+  bool ok = 1;
+  string compatibility = 2;
+  string message = 3;
+}
+
+message StartRequest {
+  string workflow_id = 1;
+  string version_hash = 2;
+  string input_json = 3;
+}
+message StartResponse { string execution_id = 1; }
+
+message PollRequest {
+  string worker_id = 1;
+  string version_hash = 2;
+}
+message PollResponse {
+  bool has_task = 1;
+  string task_id = 2;
+  string execution_id = 3;
+  string node_id = 4;
+  string input_json = 5;
+  string idempotency_key = 6;
+  string node_type = 7;
+  string map_item_json = 10;
+  bool is_map_subtask = 11;
+  int32 map_index = 12;
+  int32 map_total = 13;
+  string sub_execution_id = 14;
+  string sub_workflow_id = 15;
+  string sub_input_json = 16;
+}
+
+message CompleteRequest {
+  string task_id = 1;
+  string output_json = 2;
+}
+
+message FailRequest {
+  string task_id = 1;
+  string error_message = 2;
+}
+
+message StatusRequest { string execution_id = 1; }
+message StatusResponse {
+  string status = 1;
+  string completed_nodes_json = 2;
+}
+
+message ListRequest {
+  string workflow_id = 1;
+  string status = 2;
+  int32 limit = 3;
+}
+
+message ExecutionSummary {
+  string execution_id = 1;
+  string workflow_id = 2;
+  string version_hash = 3;
+  string status = 4;
+  string created_at = 5;
+}
+
+message ListResponse {
+  repeated ExecutionSummary executions = 1;
+}
+
+message CancelRequest {
+  string execution_id = 1;
+}
+
+message ListVersionsRequest {
+  string workflow_id = 1;
+}
+
+message VersionInfo {
+  string workflow_id = 1;
+  string version_hash = 2;
+  string compatibility = 3;
+  string registered_at = 4;
+  int32 active_executions = 5;
+}
+
+message ListVersionsResponse {
+  repeated VersionInfo versions = 1;
+}
+
+message ApproveRequest {
+  string execution_id = 1;
+  string node_id = 2;
+  string approver = 3;
+  string comment = 4;
+}
+
+message RejectRequest {
+  string execution_id = 1;
+  string node_id = 2;
+  string approver = 3;
+  string reason = 4;
+}
+
+message EmptyRequest {}
+
+message PendingApprovalItem {
+  string execution_id = 1;
+  string node_id = 2;
+  string workflow_id = 3;
+  string started_at = 4;
+}
+
+message PendingApprovalsResponse {
+  repeated PendingApprovalItem items = 1;
+}
