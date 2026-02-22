@@ -750,8 +750,9 @@ impl NexumServer {
     }
 }
 
-// --- ROUTER condition evaluator ---
+// --- ROUTER condition evaluator (reserved for future server-side evaluation) ---
 
+#[allow(dead_code)]
 fn evaluate_condition(condition: &str, data: &serde_json::Value) -> bool {
     let condition = condition.trim();
 
@@ -775,6 +776,7 @@ fn evaluate_condition(condition: &str, data: &serde_json::Value) -> bool {
     }
 }
 
+#[allow(dead_code)]
 fn parse_condition(condition: &str) -> Option<(String, String, String)> {
     for op in &[">=", "<=", "!=", "==", ">", "<"] {
         if let Some(pos) = condition.find(op) {
@@ -786,6 +788,7 @@ fn parse_condition(condition: &str) -> Option<(String, String, String)> {
     None
 }
 
+#[allow(dead_code)]
 fn get_json_path(data: &serde_json::Value, path: &str) -> serde_json::Value {
     let path = path.trim_start_matches("$.");
     let parts: Vec<&str> = path.split('.').collect();
@@ -799,6 +802,7 @@ fn get_json_path(data: &serde_json::Value, path: &str) -> serde_json::Value {
     current.clone()
 }
 
+#[allow(dead_code)]
 fn json_equals(a: &serde_json::Value, b: &str) -> bool {
     match a {
         serde_json::Value::Bool(v) => (b == "true" && *v) || (b == "false" && !*v),
@@ -808,19 +812,23 @@ fn json_equals(a: &serde_json::Value, b: &str) -> bool {
     }
 }
 
+#[allow(dead_code)]
 fn json_gt(a: &serde_json::Value, b: &str) -> bool {
     let av = a.as_f64().unwrap_or(0.0);
     let bv: f64 = b.parse().unwrap_or(0.0);
     av > bv
 }
 
+#[allow(dead_code)]
 fn json_lt(a: &serde_json::Value, b: &str) -> bool {
     let av = a.as_f64().unwrap_or(0.0);
     let bv: f64 = b.parse().unwrap_or(0.0);
     av < bv
 }
 
+#[allow(dead_code)]
 fn json_gte(a: &serde_json::Value, b: &str) -> bool { !json_lt(a, b) }
+#[allow(dead_code)]
 fn json_lte(a: &serde_json::Value, b: &str) -> bool { !json_gt(a, b) }
 
 fn analyze_compatibility(old_ir: &Value, new_ir: &Value) -> &'static str {
@@ -2050,21 +2058,27 @@ async fn main() -> Result<()> {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
             let reclaim_sql = if reclaim_is_postgres {
-                "UPDATE task_queue SET status = 'READY', locked_by = NULL, locked_at = NULL,
-                 retry_count = retry_count + 1
-                 WHERE status = 'RUNNING'
-                 AND locked_at < NOW() - INTERVAL '60 seconds'
-                 AND (approval_status IS NULL OR approval_status != 'PENDING')
-                 AND (sub_execution_id IS NULL OR sub_execution_id = '')"
+                format!(
+                    "UPDATE task_queue SET status = 'READY', locked_by = NULL, locked_at = NULL,
+                     retry_count = retry_count + 1
+                     WHERE status = 'RUNNING'
+                     AND locked_at < NOW() - INTERVAL '{} seconds'
+                     AND (approval_status IS NULL OR approval_status != 'PENDING')
+                     AND (sub_execution_id IS NULL OR sub_execution_id = '')",
+                    TASK_TIMEOUT_SECS
+                )
             } else {
-                "UPDATE task_queue SET status = 'READY', locked_by = NULL, locked_at = NULL,
-                 retry_count = retry_count + 1
-                 WHERE status = 'RUNNING'
-                 AND locked_at < datetime('now', '-60 seconds')
-                 AND (approval_status IS NULL OR approval_status != 'PENDING')
-                 AND (sub_execution_id IS NULL OR sub_execution_id = '')"
+                format!(
+                    "UPDATE task_queue SET status = 'READY', locked_by = NULL, locked_at = NULL,
+                     retry_count = retry_count + 1
+                     WHERE status = 'RUNNING'
+                     AND locked_at < datetime('now', '-{} seconds')
+                     AND (approval_status IS NULL OR approval_status != 'PENDING')
+                     AND (sub_execution_id IS NULL OR sub_execution_id = '')",
+                    TASK_TIMEOUT_SECS
+                )
             };
-            let result = sqlx::query(reclaim_sql)
+            let result = sqlx::query(&reclaim_sql)
                 .execute(&reclaim_db)
                 .await;
 

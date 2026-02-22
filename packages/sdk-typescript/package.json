@@ -1,6 +1,6 @@
 {
   "name": "nexum-js",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "TypeScript SDK for Nexum  EDurable Execution Engine for LLM Agents",
   "type": "module",
   "main": "./dist/index.js",

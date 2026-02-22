@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nexum-py"
-version = "0.1.2"
+version = "0.2.0"
 description = "Python SDK for Nexum  EDurable Execution Engine for LLM Agents"
 readme = "README.md"
 license = { text = "MIT" }
