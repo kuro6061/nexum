@@ -74,7 +74,7 @@ async def main():
 
     # Start worker — runs forever, polling for tasks
     logger.info("Worker started. Waiting for tasks on localhost:50051 ...")
-    w = Worker([tool_call_workflow], concurrency=4, poll_interval=0.5)
+    w = Worker([tool_call_workflow], concurrency=4, poll_interval=0.1)
     w._running = True
     await w._run()
 

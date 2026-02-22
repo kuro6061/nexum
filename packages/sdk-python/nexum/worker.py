@@ -22,7 +22,7 @@ class Worker:
         workflows: list,
         *,
         concurrency: int = 4,
-        poll_interval: float = 0.5,
+        poll_interval: float = 0.1,
         host: str = "localhost",
         port: int = 50051,
     ):

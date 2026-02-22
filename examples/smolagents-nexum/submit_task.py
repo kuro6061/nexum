@@ -48,7 +48,6 @@ def submit_tool_call(
     tool_name: str,
     tool_args: dict,
     session_id: str = "default",
-    poll_interval: float = 0.5,
     timeout: float = 120,
 ) -> str:
     """
@@ -57,6 +56,10 @@ def submit_tool_call(
     If this exact tool call (same name + args) was already completed in a
     previous run of the same session, the cached result is returned
     immediately — this is the crash-recovery mechanism.
+
+    Polling strategy: tight loop (50ms) for first 2s, then 200ms thereafter.
+    This minimises latency for fast EFFECTs while not hammering the server
+    for long-running ones.
 
     Returns the tool result as a string.
     """
@@ -92,23 +95,32 @@ def submit_tool_call(
         # Persist mapping immediately so a crash right after submit still recovers
         session[key] = exec_id
         _save_session(session_id, session)
-        print(f"[Nexum] Submitted workflow {exec_id[:20]}... for {tool_name}")
+        print(f"[Nexum] Submitted {exec_id[:16]}... ({tool_name})")
 
-    # Poll until complete
+    # Adaptive polling: tight (50ms) for first 2s → relaxed (200ms) after
     deadline = time.time() + timeout
+    fast_until = time.time() + 2.0
+    last_log = 0.0
+
     while time.time() < deadline:
         status = client.get_status(exec_id)
         st = status["status"]
         if st == "COMPLETED":
             result = status["completedNodes"].get("tool_call", {}).get("result", "")
-            print(f"[Nexum] {exec_id[:20]}... COMPLETED [done]")
+            print(f"[Nexum] {exec_id[:16]}... done")
             client.close()
             return result
         if st in ("FAILED", "CANCELLED"):
             client.close()
             raise RuntimeError(f"Nexum execution {exec_id} {st}")
-        print(f"[Nexum] {exec_id[:20]}... {st}...")
-        time.sleep(poll_interval)
+
+        # Log at most once per second to reduce noise
+        now = time.time()
+        if now - last_log >= 1.0:
+            print(f"[Nexum] {exec_id[:16]}... waiting ({st})")
+            last_log = now
+
+        time.sleep(0.05 if time.time() < fast_until else 0.2)
 
     client.close()
     raise TimeoutError(f"Nexum execution {exec_id} did not complete within {timeout}s")
