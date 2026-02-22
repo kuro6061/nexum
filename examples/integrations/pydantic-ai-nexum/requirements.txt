@@ -1,0 +1,6 @@
+-e ../../../packages/sdk-python
+pydantic-ai>=0.0.20
+ddgs
+markdownify
+grpcio>=1.60.0
+protobuf
