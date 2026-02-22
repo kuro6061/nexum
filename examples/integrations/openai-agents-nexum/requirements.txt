@@ -1,0 +1,6 @@
+-e ../../../packages/sdk-python
+openai-agents>=0.0.17
+ddgs
+markdownify
+grpcio>=1.60.0
+protobuf
