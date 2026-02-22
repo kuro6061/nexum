@@ -38,3 +38,6 @@ Thumbs.db
 
 # smolagents-nexum session cache
 .session-*.json
+
+cmd/nexum/nexum.exe
+cmd/nexum/nexum
