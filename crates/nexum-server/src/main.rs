@@ -2105,3 +2105,358 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tonic::Request;
+
+    /// Create a NexumServer backed by in-memory SQLite for testing.
+    ///
+    /// We run the DDL statements directly (without the PRAGMA-based
+    /// migration path) because sqlx's `Any` driver does not reliably
+    /// return PRAGMA results on a fresh :memory: database.
+    async fn test_server() -> NexumServer {
+        sqlx::any::install_default_drivers();
+        // max_connections(1) で全クエリが同一コネクションを使い、:memory: DBが消えない
+        let db = sqlx::pool::PoolOptions::<sqlx::Any>::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+
+        for ddl in &[
+            "CREATE TABLE IF NOT EXISTS workflow_executions (
+                execution_id TEXT PRIMARY KEY,
+                workflow_id TEXT NOT NULL,
+                version_hash TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'RUNNING',
+                input_json TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                parent_execution_id TEXT,
+                parent_node_id TEXT
+            )",
+            "CREATE TABLE IF NOT EXISTS events (
+                event_id TEXT PRIMARY KEY,
+                execution_id TEXT NOT NULL,
+                sequence_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(execution_id, sequence_id)
+            )",
+            "CREATE TABLE IF NOT EXISTS task_queue (
+                task_id TEXT PRIMARY KEY,
+                execution_id TEXT NOT NULL,
+                node_id TEXT NOT NULL,
+                version_hash TEXT NOT NULL,
+                input_json TEXT,
+                idempotency_key TEXT,
+                status TEXT NOT NULL DEFAULT 'READY',
+                locked_by TEXT,
+                locked_at TEXT,
+                retry_count INTEGER DEFAULT 0,
+                scheduled_at TEXT DEFAULT (datetime('now')),
+                approval_status TEXT,
+                approver TEXT,
+                approval_comment TEXT,
+                sub_execution_id TEXT,
+                sub_workflow_id TEXT,
+                sub_input_json TEXT,
+                map_item_json TEXT,
+                map_index INTEGER,
+                map_total INTEGER,
+                map_parent_node_id TEXT,
+                node_type TEXT
+            )",
+            "CREATE TABLE IF NOT EXISTS workflow_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workflow_id TEXT NOT NULL,
+                version_hash TEXT NOT NULL,
+                ir_json TEXT NOT NULL,
+                compatibility TEXT NOT NULL DEFAULT 'UNKNOWN',
+                registered_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(workflow_id, version_hash)
+            )",
+            "CREATE TABLE IF NOT EXISTS map_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                execution_id TEXT NOT NULL,
+                map_node_id TEXT NOT NULL,
+                item_index INTEGER NOT NULL,
+                result_json TEXT NOT NULL,
+                UNIQUE(execution_id, map_node_id, item_index)
+            )",
+        ] {
+            sqlx::query(ddl).execute(&db).await.unwrap();
+        }
+
+        NexumServer {
+            db,
+            is_postgres: false,
+            registry: Arc::new(RwLock::new(HashMap::new())),
+            metrics: Metrics::new(),
+        }
+    }
+
+    /// Helper: a simple two-node IR (A → B) as JSON string.
+    fn two_node_ir() -> String {
+        serde_json::json!({
+            "nodes": {
+                "A": { "type": "COMPUTE", "dependencies": [] },
+                "B": { "type": "COMPUTE", "dependencies": ["A"] }
+            }
+        })
+        .to_string()
+    }
+
+    /// Register a workflow through the gRPC trait method and return the AckResponse.
+    async fn register(server: &NexumServer, workflow_id: &str, version_hash: &str, ir_json: &str) -> AckResponse {
+        let resp = server
+            .register_workflow(Request::new(WorkflowIr {
+                workflow_id: workflow_id.to_string(),
+                version_hash: version_hash.to_string(),
+                ir_json: ir_json.to_string(),
+            }))
+            .await
+            .unwrap();
+        resp.into_inner()
+    }
+
+    // ---------------------------------------------------------------
+    // 1. Workflow registration → version compatibility detection
+    // ---------------------------------------------------------------
+    #[tokio::test]
+    async fn test_register_workflow_version_detection() {
+        let srv = test_server().await;
+        let ir_v1 = two_node_ir();
+
+        // First registration → NEW
+        let ack1 = register(&srv, "wf1", "hash-v1", &ir_v1).await;
+        assert!(ack1.ok);
+        assert_eq!(ack1.compatibility, "NEW");
+
+        // Same IR, same hash → IDENTICAL (INSERT OR IGNORE, returns NEW
+        // because the row already exists and the code won't find a *previous*
+        // row with a different hash). Re-register with a *different* hash
+        // but identical JSON to test IDENTICAL.
+        let ack2 = register(&srv, "wf1", "hash-v1-dup", &ir_v1).await;
+        assert!(ack2.ok);
+        assert_eq!(ack2.compatibility, "IDENTICAL");
+
+        // Add a new node C (superset) → SAFE
+        let ir_v2 = serde_json::json!({
+            "nodes": {
+                "A": { "type": "COMPUTE", "dependencies": [] },
+                "B": { "type": "COMPUTE", "dependencies": ["A"] },
+                "C": { "type": "COMPUTE", "dependencies": ["B"] }
+            }
+        })
+        .to_string();
+        let ack3 = register(&srv, "wf1", "hash-v2", &ir_v2).await;
+        assert!(ack3.ok);
+        assert_eq!(ack3.compatibility, "SAFE");
+
+        // Remove node A (subset) → BREAKING
+        let ir_v3 = serde_json::json!({
+            "nodes": {
+                "B": { "type": "COMPUTE", "dependencies": [] }
+            }
+        })
+        .to_string();
+        let ack4 = register(&srv, "wf1", "hash-v3", &ir_v3).await;
+        assert!(ack4.ok);
+        assert_eq!(ack4.compatibility, "BREAKING");
+    }
+
+    // ---------------------------------------------------------------
+    // 2. StartExecution → execution record created
+    // ---------------------------------------------------------------
+    #[tokio::test]
+    async fn test_start_execution_creates_record() {
+        let srv = test_server().await;
+        let ir = two_node_ir();
+        register(&srv, "wf1", "h1", &ir).await;
+
+        let resp = srv
+            .start_execution(Request::new(StartRequest {
+                workflow_id: "wf1".into(),
+                version_hash: "h1".into(),
+                input_json: r#"{"x":1}"#.into(),
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert!(resp.execution_id.starts_with("exec-"));
+
+        // Verify DB row
+        let row: (String, String) = sqlx::query_as(
+            "SELECT status, workflow_id FROM workflow_executions WHERE execution_id = ?"
+        )
+        .bind(&resp.execution_id)
+        .fetch_one(&srv.db)
+        .await
+        .unwrap();
+
+        assert_eq!(row.0, "RUNNING");
+        assert_eq!(row.1, "wf1");
+
+        // Node A (no deps) should be scheduled as READY
+        let tasks: Vec<(String, String)> = sqlx::query_as(
+            "SELECT node_id, status FROM task_queue WHERE execution_id = ?"
+        )
+        .bind(&resp.execution_id)
+        .fetch_all(&srv.db)
+        .await
+        .unwrap();
+
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].0, "A");
+        assert_eq!(tasks[0].1, "READY");
+    }
+
+    // ---------------------------------------------------------------
+    // 3. ClaimTask (PollTask) → RUNNING transition, no double-claim
+    // ---------------------------------------------------------------
+    #[tokio::test]
+    async fn test_claim_task_running_no_double_claim() {
+        let srv = test_server().await;
+        let ir = two_node_ir();
+        register(&srv, "wf1", "h1", &ir).await;
+
+        let exec = srv
+            .start_execution(Request::new(StartRequest {
+                workflow_id: "wf1".into(),
+                version_hash: "h1".into(),
+                input_json: "{}".into(),
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+
+        // First poll → should get task A
+        let poll1 = srv
+            .poll_task(Request::new(PollRequest {
+                worker_id: "w1".into(),
+                version_hash: "h1".into(),
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert!(poll1.has_task);
+        assert_eq!(poll1.node_id, "A");
+        assert_eq!(poll1.execution_id, exec.execution_id);
+
+        // Verify task_queue row is now RUNNING
+        let status: (String,) = sqlx::query_as(
+            "SELECT status FROM task_queue WHERE task_id = ?"
+        )
+        .bind(&poll1.task_id)
+        .fetch_one(&srv.db)
+        .await
+        .unwrap();
+        assert_eq!(status.0, "RUNNING");
+
+        // Second poll → no task available (already claimed)
+        let poll2 = srv
+            .poll_task(Request::new(PollRequest {
+                worker_id: "w2".into(),
+                version_hash: "h1".into(),
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert!(!poll2.has_task);
+    }
+
+    // ---------------------------------------------------------------
+    // 4. CompleteTask → dependent node becomes READY (PENDING)
+    // ---------------------------------------------------------------
+    #[tokio::test]
+    async fn test_complete_task_schedules_dependents() {
+        let srv = test_server().await;
+        let ir = two_node_ir(); // A → B
+        register(&srv, "wf1", "h1", &ir).await;
+
+        let exec = srv
+            .start_execution(Request::new(StartRequest {
+                workflow_id: "wf1".into(),
+                version_hash: "h1".into(),
+                input_json: "{}".into(),
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+
+        // Poll task A
+        let poll = srv
+            .poll_task(Request::new(PollRequest {
+                worker_id: "w1".into(),
+                version_hash: "h1".into(),
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+        assert!(poll.has_task);
+        assert_eq!(poll.node_id, "A");
+
+        // Before completing A, B should NOT be in task_queue
+        let before: Vec<(String,)> = sqlx::query_as(
+            "SELECT node_id FROM task_queue WHERE execution_id = ? AND node_id = 'B'"
+        )
+        .bind(&exec.execution_id)
+        .fetch_all(&srv.db)
+        .await
+        .unwrap();
+        assert!(before.is_empty(), "B should not be scheduled yet");
+
+        // Complete task A
+        srv.complete_task(Request::new(CompleteRequest {
+            task_id: poll.task_id.clone(),
+            output_json: r#"{"result":"ok"}"#.into(),
+        }))
+        .await
+        .unwrap();
+
+        // Now B should be scheduled as READY
+        let after: (String, String) = sqlx::query_as(
+            "SELECT node_id, status FROM task_queue WHERE execution_id = ? AND node_id = 'B'"
+        )
+        .bind(&exec.execution_id)
+        .fetch_one(&srv.db)
+        .await
+        .unwrap();
+        assert_eq!(after.0, "B");
+        assert_eq!(after.1, "READY");
+
+        // Complete B and verify execution is COMPLETED
+        let poll_b = srv
+            .poll_task(Request::new(PollRequest {
+                worker_id: "w1".into(),
+                version_hash: "h1".into(),
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+        assert!(poll_b.has_task);
+        assert_eq!(poll_b.node_id, "B");
+
+        srv.complete_task(Request::new(CompleteRequest {
+            task_id: poll_b.task_id.clone(),
+            output_json: r#"{"final":"done"}"#.into(),
+        }))
+        .await
+        .unwrap();
+
+        let exec_status: (String,) = sqlx::query_as(
+            "SELECT status FROM workflow_executions WHERE execution_id = ?"
+        )
+        .bind(&exec.execution_id)
+        .fetch_one(&srv.db)
+        .await
+        .unwrap();
+        assert_eq!(exec_status.0, "COMPLETED");
+    }
+}
