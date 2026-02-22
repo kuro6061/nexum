@@ -26,8 +26,8 @@ if _gemini_key:
         "OPENAI_BASE_URL",
         "https://generativelanguage.googleapis.com/v1beta/openai",
     )
-os.environ.setdefault("FAST_LLM", "gemini-3-flash-preview")
-os.environ.setdefault("SMART_LLM", "gemini-3-flash-preview")
+os.environ.setdefault("FAST_LLM", "openai:gemini-3-flash-preview")
+os.environ.setdefault("SMART_LLM", "openai:gemini-3-flash-preview")
 os.environ.setdefault("LLM_PROVIDER", "openai")
 os.environ.setdefault("RETRIEVER", "duckduckgo")
 
@@ -48,11 +48,13 @@ async def main():
     print(f"[demo] Nexum session prefix: {nexum_retriever.MAIN_SESSION}")
     print()
 
+    # NOTE: Do NOT pass retrievers= to the constructor — it leaks into LLM kwargs
+    # (gpt-researcher bug). Set it directly after construction instead.
     researcher = GPTResearcher(
         query=query,
         report_type="research_report",
-        retrievers=[nexum_retriever.NexumDuckduckgo],
     )
+    researcher.retrievers = [nexum_retriever.NexumDuckduckgo]
 
     await researcher.conduct_research()
     report = await researcher.write_report()

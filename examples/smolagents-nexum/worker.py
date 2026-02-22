@@ -41,13 +41,31 @@ class ToolCallOutput(BaseModel):
 def handle_tool_call(ctx):
     """Execute a smolagents tool and return its result."""
     tool_name = ctx.input["tool_name"]
-    tool_args = ctx.input["tool_args"]
+    tool_args = dict(ctx.input["tool_args"])  # mutable copy
+
+    logger.info(f"Executing tool '{tool_name}' with args: {json.dumps(tool_args)[:200]}")
+
+    # web_search: use DDGS directly so we can support max_results kwarg
+    # (smolagents DuckDuckGoSearchTool.forward() doesn't accept max_results)
+    if tool_name == "web_search":
+        from ddgs import DDGS
+        query = tool_args.get("query", "")
+        max_results = tool_args.get("max_results", 10)
+        ddg = DDGS()
+        try:
+            results = list(ddg.text(query, max_results=max_results))
+        except Exception as e:
+            logger.warning(f"DDGS error: {e}, retrying with DuckDuckGoSearchTool")
+            results_str = TOOLS["web_search"](query)
+            logger.info(f"Tool 'web_search' returned {len(results_str)} chars")
+            return ToolCallOutput(result=results_str)
+        result_str = json.dumps(results)
+        logger.info(f"Tool 'web_search' returned {len(results)} results ({len(result_str)} chars)")
+        return ToolCallOutput(result=result_str)
 
     tool = TOOLS.get(tool_name)
     if tool is None:
         raise ValueError(f"Unknown tool: {tool_name}. Available: {list(TOOLS.keys())}")
-
-    logger.info(f"Executing tool '{tool_name}' with args: {json.dumps(tool_args)[:200]}")
 
     # smolagents tools are callable: tool(**kwargs) -> str
     result = tool(**tool_args)
