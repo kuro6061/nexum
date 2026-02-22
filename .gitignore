@@ -35,3 +35,6 @@ Thumbs.db
 .env.local
 .env.*.local
 *.env
+
+# smolagents-nexum session cache
+.session-*.json
